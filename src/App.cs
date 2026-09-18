@@ -245,7 +245,7 @@ namespace XbarControl {
             UI<TextBlock>("InputHint").SetResourceReference(TextBlock.ForegroundProperty,invalid?"Error":"Muted");
             UI<TextBox>("OffsetInput").SetResourceReference(Control.BorderBrushProperty,invalid?"Error":"InputLine");
             Text("DeltaText",!has?"현재 값 확인 필요":!valid?"입력값 확인 필요":dirty?"현재 대비 "+Signed(target.Value-last.OffsetKhz/1000.0)+" MHz":"현재 값과 같습니다");
-            string badge=failed?"연결 확인 필요":applying?"적용 확인 중":!has?"연결 중":!last.Compatible?"읽기 전용":dirty?"변경 대기":"현재 값";
+            string badge=failed?"연결 확인 필요":applying?"적용 확인 중":!has?"연결 중":!last.Compatible?"읽기 전용":dirty?"변경 대기":"변경 없음";
             Text("StateBadgeText",badge);
             UI<Border>("StateBadge").SetResourceReference(Border.BackgroundProperty,dirty?"PendingSurface":"StatusSurface");
             Text("ApplyStatus",failed?"읽기 실패 · 새로고침해 주세요":!has?"GPU 연결 중":applying?"드라이버 응답을 확인합니다":!valid?"입력값을 확인해 주세요":!last.Compatible?"미검증 드라이버 · 적용 불가":!NvApi.IsAdmin?"적용하려면 관리자 권한 필요":dirty?"XBAR "+Signed(target.Value)+" MHz 준비됨":"변경 사항 없음");
@@ -280,11 +280,14 @@ namespace XbarControl {
             UI<CheckBox>("AppStartCheck").IsEnabled=idle&&captureArgs.Length==0&&(startup.AppStart || (startup.HasProfile&&usable));
             UI<CheckBox>("WindowsStartCheck").IsEnabled=idle&&captureArgs.Length==0&&NvApi.IsAdmin&&(startup.WindowsLogon || taskRegistered || (startup.HasProfile&&usable));
             UI<Button>("SaveStartupButton").IsEnabled=idle&&usable&&captureArgs.Length==0&&(!startup.WindowsLogon||NvApi.IsAdmin);
+            UI<Button>("SaveStartupButton").Content=startupBusy?"처리 중…":"자동 적용값 저장";
             UI<Button>("CancelStartupButton").Visibility=startupPending?Visibility.Visible:Visibility.Collapsed;
             Text("SavedStartupValue",startup.HasProfile?Signed(startup.OffsetMhz)+" MHz":"미저장");
+            bool edited=last!=null&&(!target.HasValue||target.Value*1000!=last.OffsetKhz);
+            Text("SaveStartupHint",!usable?"GPU의 현재 적용값을 확인한 뒤 저장해 주세요.":edited?"현재 적용된 "+Signed(last.OffsetKhz/1000.0)+" MHz를 저장합니다. 입력 중인 값은 먼저 XBAR 적용을 눌러 주세요.":"현재 적용된 "+Signed(last.OffsetKhz/1000.0)+" MHz를 저장합니다.");
             Text("SavedStartupDevice",startup.HasProfile?startup.GpuName.Replace("NVIDIA ","")+" · PCI "+startup.Bus+"\n드라이버 "+startup.Driver:"현재 적용값을 저장해서 사용합니다.");
             Text("StartupDetail",startupBusy?"시작 설정을 저장하고 있습니다…":startupMessage);
-            Text("StartupPermission",NvApi.IsAdmin?"Windows 로그인 20초 후 실행합니다.":"Windows 시작 설정은 관리자 권한이 필요합니다.");
+            Text("StartupPermission",NvApi.IsAdmin?"":"Windows 시작 설정은 상단에서 관리자 권한으로 연 뒤 변경해 주세요.");
             if(!NvApi.IsAdmin && captureArgs.Length==0) UI<Button>("AdminButton").Visibility=Visibility.Visible;
         }
         void CancelStartup() {
@@ -304,7 +307,7 @@ namespace XbarControl {
                 if(next.WindowsLogon) { await Task.Run(()=>StartupTask.Register()); taskRegistered=true; }
                 startupStore.Save(next); startup=next; startupStore.ClearAttempt();
                 last=current; failed=false; ShowReading();
-                startupMessage="현재 적용값 "+Signed(next.OffsetMhz)+" MHz를 저장했습니다. 시작 옵션을 선택해 주세요.";
+                startupMessage="자동 적용값 "+Signed(next.OffsetMhz)+" MHz 저장 완료. "+(next.AppStart||next.WindowsLogon?"다음 시작부터 이 값을 사용합니다.":"사용할 시작 옵션을 켜 주세요.");
                 AddEvent("자동 적용 값 저장  "+Signed(next.OffsetMhz)+" MHz");
             } catch(Exception ex) { startupMessage="저장 실패: "+ex.Message; }
             finally { startupBusy=false; Update(); }
@@ -325,7 +328,7 @@ namespace XbarControl {
                     else { startupStore.Save(next); startup=next; await Task.Run(()=>StartupTask.Remove()); taskRegistered=false; }
                 } else next.AppStart=enabled;
                 startupStore.Save(next); startup=next;
-                startupMessage=(windows?"Windows 로그인 시 실행·적용":"앱 실행 시 자동 적용")+(enabled?"을 켰습니다. 다음 시작부터 동작합니다.":"을 껐습니다.");
+                startupMessage=(windows?"Windows 시작 시 적용":"앱 실행 시 자동 적용")+(enabled?(windows?"을 켰습니다. 다음 로그인 30초 후 실행됩니다.":"을 켰습니다. 다음 시작부터 동작합니다."):"을 껐습니다.");
             } catch(Exception ex) {
                 if(newlyRegistered) { try { StartupTask.Remove(); taskRegistered=false; } catch { } }
                 startupMessage="시작 설정 변경 실패: "+ex.Message;
@@ -475,6 +478,9 @@ namespace XbarControl {
                 check(!target.HasValue&&UI<TextBox>("OffsetInput").Text=="unfinished","Incomplete input survives an in-flight refresh");
                 SetTarget(initial);
             }
+            Window.UpdateLayout();
+            var manualScroll=UI<ScrollViewer>("ManualScroll");
+            check(manualScroll.ExtentHeight<=manualScroll.ViewportHeight+1,"Manual inputs remain visible without scrolling at this window size");
             results.Add("Hardware writes performed: 0");
             string full=Path.GetFullPath(path); Directory.CreateDirectory(Path.GetDirectoryName(full)); File.WriteAllLines(full,results);
         }

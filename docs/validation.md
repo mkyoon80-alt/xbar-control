@@ -35,8 +35,8 @@ Hardware reads were checked on an RTX 5090 with driver 616.92. Hardware writes a
 
 `--diagnose <report.json>`은 실제 GPU 값을 읽고 진단 파일을 작성합니다. SET을 호출하지 않습니다.
 
-`--capture <image.png> <width> <height> [ui-check] [dark]`는 WPF 화면을 렌더링합니다. 이 모드에서는 적용, 관리자 재실행, 시작 설정 저장과 작업 등록을 비활성화합니다. `ui-check`는 입력 검증, 슬라이더 동기화, 리셋, 갱신 도중 편집 보존, 자동 적용 취소 등 19개 화면 테스트를 수행합니다. `dark`는 저장된 사용자 테마를 변경하지 않고 다크 화면을 선택합니다.
+`--capture <image.png> <width> <height> [ui-check] [dark]`는 WPF 화면을 렌더링합니다. 이 모드에서는 적용, 관리자 재실행, 시작 설정 저장과 작업 등록을 비활성화합니다. `ui-check`는 입력 검증, 슬라이더 동기화, 리셋, 갱신 도중 편집 보존, 자동 적용 취소 및 최소 창 크기의 입력 영역 검사 등 20개 화면 테스트를 수행합니다. `dark`는 저장된 사용자 테마를 변경하지 않고 다크 화면을 선택합니다.
 
 `--validate-startup-task <report.txt>`는 Windows 작업 스케줄러의 `TASK_VALIDATE_ONLY`로 XML 형식을 확인하고 기존 등록 상태를 조회합니다. 실제 작업을 생성하거나 GPU API를 호출하지 않습니다. [Microsoft 작업 등록 문서](https://learn.microsoft.com/en-us/windows/win32/taskschd/taskfolder-registertaskdefinition)를 참고하세요.
 
-개발 중 제어 데이터·설정 테스트 29개와 화면 테스트 19개가 통과했으며, 화면 테스트는 라이트·다크 모드에서 확인했습니다. Windows 작업 등록 형식 및 조회도 통과했습니다. **실제 예약 작업 설치·등록, 재로그인, GPU 쓰기 및 안정성 시험은 수행하지 않았습니다.** 테스트 통과와 실제 GPU 쓰기 검증은 별개입니다.
+개발 중 제어 데이터·설정 테스트 29개와 화면 테스트 20개가 통과했으며, 화면 테스트는 라이트·다크 모드에서 확인했습니다. Windows 작업 등록 형식 및 조회도 통과했습니다. **실제 예약 작업 설치·등록, 재로그인, GPU 쓰기 및 안정성 시험은 수행하지 않았습니다.** 테스트 통과와 실제 GPU 쓰기 검증은 별개입니다.

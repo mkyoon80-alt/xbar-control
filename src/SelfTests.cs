@@ -70,7 +70,7 @@ namespace XbarControl {
                 Require(value("//t:Exec/t:Command")==exe&&value("//t:Exec/t:Arguments")=="--startup","Command escaped incorrectly");
                 Require(value("//t:Principal/t:UserId")==sid&&value("//t:LogonTrigger/t:UserId")==sid,"Wrong user");
                 Require(value("//t:LogonType")=="InteractiveToken"&&value("//t:RunLevel")=="HighestAvailable","Logon mode");
-                Require(value("//t:Delay")=="PT20S"&&doc.SelectNodes("//t:Repetition|//t:RestartOnFailure|//t:RegistrationTrigger",ns).Count==0,"Unexpected retry or immediate trigger");
+                Require(value("//t:Delay")=="PT30S"&&doc.SelectNodes("//t:Repetition|//t:RestartOnFailure|//t:RegistrationTrigger",ns).Count==0,"Unexpected retry or immediate trigger");
             });
             rows.Add("Hardware API calls: 0. "+(rows.Count-errors)+" passed, "+errors+" failed.");
             File.WriteAllLines(report,rows); return errors==0?0:1;

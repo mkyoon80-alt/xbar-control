@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="XBAR Control" Width="1056" Height="810" MinWidth="880" MinHeight="790"
+        Title="XBAR Control" Width="1100" Height="860" MinWidth="900" MinHeight="790"
         WindowStartupLocation="CenterScreen" Background="{DynamicResource Workspace}" Foreground="{DynamicResource Ink}"
         FontFamily="Segoe UI, Malgun Gothic" FontSize="13" UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
@@ -91,7 +91,7 @@
       </ToggleButton>
       <ContentPresenter x:Name="Expanded" Visibility="Collapsed"/>
     </StackPanel><ControlTemplate.Triggers><Trigger Property="IsExpanded" Value="True"><Setter TargetName="Expanded" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
-    <Style TargetType="ScrollBar"><Setter Property="Width" Value="10"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar"><Grid Background="{DynamicResource Sidebar}"><Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="Vertical"><Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/></Track.DecreaseRepeatButton><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{DynamicResource InputLine}" CornerRadius="4" Margin="2"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False"/></Track.IncreaseRepeatButton></Track></Grid></ControlTemplate></Setter.Value></Setter></Style>
+    <Style TargetType="ScrollBar"><Setter Property="Width" Value="10"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar"><Grid Background="Transparent"><Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="Vertical"><Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/></Track.DecreaseRepeatButton><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{DynamicResource InputLine}" CornerRadius="4" Margin="2"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False"/></Track.IncreaseRepeatButton></Track></Grid></ControlTemplate></Setter.Value></Setter></Style>
     <Style x:Key="TrackButton" TargetType="RepeatButton"><Setter Property="Focusable" Value="False"/><Setter Property="IsTabStop" Value="False"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RepeatButton"><Border Height="5" Background="{TemplateBinding Background}" CornerRadius="2"/></ControlTemplate></Setter.Value></Setter></Style>
     <Style TargetType="Slider">
       <Setter Property="FocusVisualStyle" Value="{StaticResource Focus}"/>
@@ -106,15 +106,15 @@
       </ControlTemplate></Setter.Value></Setter>
     </Style>
   </Window.Resources>
-  <Grid Margin="32,26,32,20">
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="22"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <Grid>
+  <Grid Margin="28,20,28,18">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid Margin="0,0,0,16">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
         <Border Width="40" Height="40" Background="{DynamicResource Logo}" CornerRadius="9" Margin="0,0,13,0">
           <Viewbox Margin="10"><Path Data="M 0,0 L 20,20 M 20,0 L 0,20 M 0,10 L 20,10" Stroke="{DynamicResource LogoInk}" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Viewbox>
         </Border>
-        <StackPanel><TextBlock Text="XBAR Control" FontSize="25" FontWeight="SemiBold"/><TextBlock Text="크로스바 클럭을 위한 작은 컨트롤 패널" Style="{StaticResource Quiet}" Margin="0,3,0,0"/></StackPanel>
+        <StackPanel><TextBlock Text="XBAR Control" FontSize="25" FontWeight="SemiBold"/><TextBlock Text="크로스바 클럭 컨트롤 패널" Style="{StaticResource Quiet}" Margin="0,2,0,0"/></StackPanel>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <Border Background="{DynamicResource StatusSurface}" CornerRadius="9" Padding="3" Margin="0,0,12,0">
@@ -123,98 +123,99 @@
             <RadioButton x:Name="DarkTheme" Content="다크" GroupName="Theme" Style="{StaticResource ThemeChoice}" Margin="2,0,0,0" AutomationProperties.Name="다크 모드" ToolTip="어두운 화면으로 전환 · 선택 자동 저장"/>
           </StackPanel>
         </Border>
-        <Button x:Name="RefreshButton" Content="새로고침" VerticalAlignment="Center" ToolTip="GPU에서 현재 값을 다시 읽습니다. F5"/>
+        <Button x:Name="RefreshButton" Content="새로고침" ToolTip="GPU에서 현재 값을 다시 읽습니다. F5"/>
       </StackPanel>
     </Grid>
-    <Border Grid.Row="2" Background="{DynamicResource Surface}" CornerRadius="14">
+    <Border Grid.Row="1" Background="{DynamicResource Surface}" CornerRadius="10" Padding="20,16" Margin="0,0,0,14">
       <Grid>
-        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="262"/></Grid.ColumnDefinitions>
-        <Grid Margin="26,25,26,22">
-          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <Grid Margin="0,0,0,16">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <StackPanel><TextBlock Text="XBAR 오프셋" FontSize="19" FontWeight="SemiBold"/><TextBlock Text="주파수 조정 · MHz" Style="{StaticResource Quiet}" Margin="0,4,0,0"/></StackPanel>
-            <Border Grid.Column="1" x:Name="StateBadge" Background="{DynamicResource StatusSurface}" CornerRadius="5" Padding="10,6" VerticalAlignment="Top"><TextBlock x:Name="StateBadgeText" Text="연결 중" FontSize="12" Foreground="{DynamicResource StatusInk}" FontWeight="SemiBold"/></Border>
-          </Grid>
-          <Border Grid.Row="1" Background="{DynamicResource Readout}" CornerRadius="10" Padding="22,18">
-            <Grid>
-              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <TextBlock Text="현재 적용값" Foreground="{DynamicResource ReadoutMuted}" FontSize="13"/>
-              <TextBlock Text="조정할 값" Grid.Column="2" Foreground="{DynamicResource ReadoutMuted}" FontSize="13"/>
-              <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,15"><TextBlock x:Name="CurrentValue" Text="—" FontFamily="Consolas" FontSize="39" Foreground="{DynamicResource ReadoutInk}"/><TextBlock Text="MHz" Foreground="{DynamicResource ReadoutMuted}" FontSize="12" VerticalAlignment="Bottom" Margin="6,0,0,7"/></StackPanel>
-              <Path Grid.Row="1" Grid.Column="1" Data="M 0,0 L 12,0 M 7,-5 L 12,0 L 7,5" Stroke="{DynamicResource ReadoutArrow}" StrokeThickness="1.5" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-              <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,10,0,15"><TextBlock x:Name="TargetValue" Text="—" FontFamily="Consolas" FontSize="39" Foreground="{DynamicResource PendingInk}"/><TextBlock Text="MHz" Foreground="{DynamicResource ReadoutMuted}" FontSize="12" VerticalAlignment="Bottom" Margin="6,0,0,7"/></StackPanel>
-              <Border Grid.Row="2" Grid.ColumnSpan="3" BorderBrush="{DynamicResource ReadoutLine}" BorderThickness="0,1,0,0" Padding="0,13,0,0"><Grid><TextBlock Text="실측 XBAR 클럭" Foreground="{DynamicResource ReadoutMuted}" FontSize="12"/><TextBlock x:Name="PhysicalClock" Text="읽는 중…" HorizontalAlignment="Right" Foreground="{DynamicResource ReadoutInk}" FontFamily="Consolas" FontSize="14"/></Grid></Border>
-            </Grid>
-          </Border>
-          <StackPanel Grid.Row="2" Margin="0,19,0,0">
-            <Grid><TextBlock Text="오프셋 조정" FontWeight="SemiBold"/><TextBlock x:Name="DeltaText" Text="현재 값을 불러오고 있습니다" Style="{StaticResource Quiet}" HorizontalAlignment="Right"/></Grid>
-            <Slider x:Name="OffsetSlider" Minimum="-300" Maximum="500" TickFrequency="1" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" Margin="-8,13,-8,0" IsEnabled="False" AutomationProperties.Name="XBAR 오프셋 조정"/>
-            <Grid Margin="0,2,0,16"><TextBlock x:Name="RangeMin" Text="−300" Style="{StaticResource Quiet}"/><TextBlock Text="MHz" Style="{StaticResource Quiet}" HorizontalAlignment="Center"/><TextBlock x:Name="RangeMax" Text="+500" Style="{StaticResource Quiet}" HorizontalAlignment="Right"/></Grid>
-            <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="70"/></Grid.ColumnDefinitions>
-              <Button x:Name="MinusButton" Content="−15" AutomationProperties.Name="XBAR 조정값 15 MHz 낮추기" IsEnabled="False"/>
-              <Grid Grid.Column="2"><TextBox x:Name="OffsetInput" Text="" IsEnabled="False" AutomationProperties.Name="XBAR 오프셋 MHz 직접 입력" FontFamily="Consolas" FontSize="18" TextAlignment="Center" Padding="30,8"/><TextBlock Text="MHz" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" FontSize="11" Margin="0,0,12,0"/></Grid>
-              <Button x:Name="PlusButton" Grid.Column="4" Content="+15" AutomationProperties.Name="XBAR 조정값 15 MHz 높이기" IsEnabled="False"/>
-            </Grid>
-            <TextBlock x:Name="InputHint" Text="1 MHz 단위로 입력 · 버튼으로 15 MHz씩 조정" Style="{StaticResource Quiet}" Margin="0,7,0,0"/>
-            <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><Button x:Name="ResetButton" Content="리셋" FontSize="12" MinWidth="84" IsEnabled="False" ToolTip="오프셋을 0 MHz로 준비합니다. XBAR 적용을 누르면 반영됩니다."/><TextBlock Text="0 MHz로 되돌리기 · 적용 필요" Style="{StaticResource Quiet}" Margin="12,0,0,0" VerticalAlignment="Center"/></StackPanel>
-          </StackPanel>
-          <Grid Grid.Row="4" Margin="0,16,0,0">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <StackPanel VerticalAlignment="Center" Margin="0,0,14,0"><TextBlock x:Name="ApplyStatus" Text="GPU 연결 중" FontWeight="SemiBold" FontSize="13"/><TextBlock Text="적용 버튼을 눌러야 변경됩니다" Style="{StaticResource Quiet}" Margin="0,4,0,0"/></StackPanel>
-            <Button x:Name="ApplyButton" Grid.Column="1" Content="XBAR 적용" Style="{StaticResource Primary}" MinWidth="132" MinHeight="46" IsEnabled="False"/>
-          </Grid>
-        </Grid>
-        <Border Grid.Column="1" Background="{DynamicResource Sidebar}" CornerRadius="0,14,14,0" Padding="21,25,21,22">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,3,0" CanContentScroll="False">
-            <StackPanel>
-            <StackPanel>
-              <TextBlock Text="연결된 GPU" FontSize="13" FontWeight="SemiBold"/>
-              <TextBlock x:Name="GpuName" Text="NVIDIA GPU 검색 중…" FontSize="19" FontWeight="SemiBold" Margin="0,13,0,8" LineHeight="27"/>
-              <ComboBox x:Name="GpuSelector" Visibility="Collapsed" Margin="0,3,0,10" AutomationProperties.Name="제어할 NVIDIA GPU"/>
-              <TextBlock x:Name="DriverText" Text="드라이버 확인 중" Style="{StaticResource Quiet}"/>
-              <TextBlock x:Name="BusText" Text="" Style="{StaticResource Quiet}" Margin="0,2,0,0"/>
-            </StackPanel>
-            <Border BorderBrush="{DynamicResource SidebarLine}" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,18,0,0">
-              <StackPanel>
-                <TextBlock Text="시작 시 자동 적용" FontWeight="SemiBold"/>
-                <Grid Margin="0,10,0,3"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <TextBlock x:Name="SavedStartupValue" Text="미저장" FontFamily="Consolas, Malgun Gothic" FontSize="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                  <Button x:Name="SaveStartupButton" Grid.Column="1" Content="현재 값 저장" FontSize="12" Padding="9,7" MinHeight="36" ToolTip="GPU에 현재 적용된 값을 자동 적용용으로 저장합니다. 입력 중인 값은 저장하지 않습니다."/>
-                </Grid>
-                <TextBlock x:Name="SavedStartupDevice" Style="{StaticResource Quiet}" Margin="0,0,0,3"/>
-                <CheckBox x:Name="AppStartCheck" Content="앱 실행 시 적용" AutomationProperties.Name="앱 실행 시 저장된 XBAR 값 자동 적용"/>
-                <CheckBox x:Name="WindowsStartCheck" Content="Windows 시작 시 적용" AutomationProperties.Name="Windows 로그인 시 실행하고 저장된 XBAR 값 적용"/>
-                <TextBlock x:Name="StartupDetail" Text="현재 적용값을 저장한 뒤 켜 주세요." Style="{StaticResource Quiet}" Margin="0,5,0,0" AutomationProperties.LiveSetting="Polite"/>
-                <Button x:Name="CancelStartupButton" Content="이번 자동 적용 취소" FontSize="12" Margin="0,8,0,0" Visibility="Collapsed"/>
-                <TextBlock x:Name="StartupPermission" Style="{StaticResource Quiet}" Margin="0,6,0,0"/>
-                <Button x:Name="AdminButton" Content="관리자 권한으로 열기" Margin="0,10,0,0" FontSize="12" Visibility="Collapsed"/>
-              </StackPanel>
-            </Border>
-            <Border Grid.Row="1" BorderBrush="{DynamicResource SidebarLine}" BorderThickness="0,1,0,0" Padding="0,18,0,0" Margin="0,20,0,0">
-              <StackPanel>
-                <TextBlock x:Name="ConnectionTitle" Text="상태를 확인하고 있습니다" FontWeight="SemiBold" FontSize="13"/>
-                <TextBlock x:Name="ConnectionDetail" Text="드라이버와 XBAR 데이터를 읽습니다." Style="{StaticResource Quiet}" Margin="0,7,0,0"/>
-                <Expander x:Name="CompatibilityExpander" Header="호환성 상세" FontSize="12" Margin="0,13,0,0" Foreground="{DynamicResource Muted}"><TextBlock x:Name="TechnicalDetail" Text="검사 중" Style="{StaticResource Quiet}" Margin="0,8,0,0"/></Expander>
-              </StackPanel>
-            </Border>
-            <Border Grid.Row="2" BorderBrush="{DynamicResource SidebarLine}" BorderThickness="0,1,0,0" Padding="0,18,0,0" Margin="0,18,0,0"><TextBlock Text="이번 세션" FontWeight="SemiBold" FontSize="13"/></Border>
-            <StackPanel x:Name="EventPanel" Grid.Row="3" Margin="0,10,0,0"/>
-            </StackPanel>
-            </ScrollViewer>
-            <StackPanel Grid.Row="1" Margin="0,12,0,0">
-              <TextBlock Text="XBAR 주파수만 제어합니다." FontSize="12" FontWeight="SemiBold"/>
-              <TextBlock Text="코어 · 메모리 · 전압 설정은 유지됩니다." Style="{StaticResource Quiet}" Margin="0,6,0,0"/>
-              <TextBlock Text="자동 적용은 저장한 값만 사용합니다." Style="{StaticResource Quiet}" Margin="0,4,0,0"/>
-            </StackPanel>
-          </Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <StackPanel Margin="0,0,20,0" VerticalAlignment="Center">
+          <TextBlock x:Name="GpuName" Text="NVIDIA GPU 검색 중…" FontSize="17" FontWeight="SemiBold"/>
+          <ComboBox x:Name="GpuSelector" Visibility="Collapsed" Margin="0,8,0,0" AutomationProperties.Name="제어할 NVIDIA GPU"/>
+          <WrapPanel Margin="0,5,0,0"><TextBlock x:Name="DriverText" Text="드라이버 확인 중" Style="{StaticResource Quiet}" Margin="0,0,12,0"/><TextBlock x:Name="BusText" Style="{StaticResource Quiet}"/></WrapPanel>
+        </StackPanel>
+        <Border Grid.Column="1" BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0" Padding="20,0,0,0" VerticalAlignment="Center">
+          <StackPanel><TextBlock x:Name="ConnectionTitle" Text="상태를 확인하고 있습니다" FontWeight="SemiBold"/><TextBlock x:Name="ConnectionDetail" Text="드라이버와 XBAR 데이터를 읽습니다." Style="{StaticResource Quiet}" Margin="0,4,0,0" AutomationProperties.LiveSetting="Polite"/></StackPanel>
         </Border>
+        <Button x:Name="AdminButton" Grid.Column="2" Content="관리자 권한으로 열기" Margin="20,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
       </Grid>
     </Border>
-    <Grid Grid.Row="3" Margin="0,14,0,0"><TextBlock x:Name="LastRead" Text="로컬 GPU에 연결 중" Style="{StaticResource Quiet}"/><TextBlock Text="XBAR Control 1.2" HorizontalAlignment="Right" Style="{StaticResource Quiet}"/></Grid>
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="340"/></Grid.ColumnDefinitions>
+      <Border Background="{DynamicResource Surface}" CornerRadius="12" Padding="24,20">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <ScrollViewer x:Name="ManualScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+            <StackPanel>
+              <Grid Margin="0,0,0,14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock Text="XBAR 조정" FontSize="19" FontWeight="SemiBold"/>
+                <Border Grid.Column="1" x:Name="StateBadge" Background="{DynamicResource StatusSurface}" CornerRadius="5" Padding="10,6" VerticalAlignment="Top"><TextBlock x:Name="StateBadgeText" Text="연결 중" FontSize="12" Foreground="{DynamicResource StatusInk}" FontWeight="SemiBold"/></Border>
+              </Grid>
+              <Border Background="{DynamicResource Readout}" CornerRadius="10" Padding="18,10">
+                <Grid>
+                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="26"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="현재 적용값 · MHz" FontSize="12" Foreground="{DynamicResource ReadoutMuted}"/>
+                  <TextBlock Grid.Column="2" Text="적용할 값 · MHz" FontSize="12" Foreground="{DynamicResource ReadoutMuted}"/>
+                  <TextBlock x:Name="CurrentValue" Grid.Row="1" Text="—" FontFamily="Consolas" FontSize="32" Foreground="{DynamicResource ReadoutInk}" Margin="0,6,0,0"/>
+                  <Path Grid.Row="1" Grid.Column="1" Data="M 0,6 L 12,6 M 7,1 L 12,6 L 7,11" Stroke="{DynamicResource ReadoutArrow}" StrokeThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="TargetValue" Grid.Row="1" Grid.Column="2" Text="—" FontFamily="Consolas" FontSize="32" Foreground="{DynamicResource PendingInk}" Margin="0,6,0,0"/>
+                  <Border Grid.Row="2" Grid.ColumnSpan="3" Margin="0,12,0,0" BorderBrush="{DynamicResource ReadoutLine}" BorderThickness="0,1,0,0" Padding="0,10,0,0"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="실측 XBAR 클럭" Foreground="{DynamicResource ReadoutMuted}" FontSize="12"/><TextBlock x:Name="PhysicalClock" Grid.Column="1" Text="읽는 중…" Foreground="{DynamicResource ReadoutInk}" FontFamily="Consolas" FontSize="14"/></Grid></Border>
+                </Grid>
+              </Border>
+              <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="오프셋 · MHz" FontWeight="SemiBold"/><TextBlock x:Name="DeltaText" Grid.Column="1" Text="현재 값 확인 중" Style="{StaticResource Quiet}" HorizontalAlignment="Right" Margin="12,0,0,0"/></Grid>
+              <Slider x:Name="OffsetSlider" Minimum="-300" Maximum="500" TickFrequency="1" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" Margin="0,8,0,0" IsEnabled="False" AutomationProperties.Name="XBAR 오프셋 조정"/>
+              <Grid Margin="0,0,0,10"><TextBlock x:Name="RangeMin" Text="−300" Style="{StaticResource Quiet}"/><TextBlock x:Name="RangeMax" Text="+500" Style="{StaticResource Quiet}" HorizontalAlignment="Right"/></Grid>
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="64"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="64"/></Grid.ColumnDefinitions>
+                <Button x:Name="MinusButton" Content="−15" AutomationProperties.Name="XBAR 조정값 15 MHz 낮추기" IsEnabled="False"/>
+                <Grid Grid.Column="2"><TextBox x:Name="OffsetInput" Text="" IsEnabled="False" AutomationProperties.Name="XBAR 오프셋 MHz 직접 입력" FontFamily="Consolas" FontSize="18" TextAlignment="Center" Padding="30,8"/><TextBlock Text="MHz" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,0,10,0"/></Grid>
+                <Button x:Name="PlusButton" Grid.Column="4" Content="+15" AutomationProperties.Name="XBAR 조정값 15 MHz 높이기" IsEnabled="False"/>
+              </Grid>
+              <TextBlock x:Name="InputHint" Text="1 MHz 단위로 입력 · 버튼으로 15 MHz씩 조정" Style="{StaticResource Quiet}" Margin="0,7,0,0"/>
+            </StackPanel>
+          </ScrollViewer>
+          <Border Grid.Row="1" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
+            <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <TextBlock x:Name="ApplyStatus" Grid.ColumnSpan="2" Text="GPU 연결 중" FontWeight="SemiBold" Margin="0,0,0,10"/>
+              <StackPanel Grid.Row="1" Orientation="Horizontal"><Button x:Name="ResetButton" Content="리셋" MinWidth="78" IsEnabled="False" ToolTip="오프셋을 0 MHz로 준비합니다. XBAR 적용을 누르면 반영됩니다."/><TextBlock Text="0 MHz 준비" Style="{StaticResource Quiet}" VerticalAlignment="Center" Margin="10,0,12,0"/></StackPanel>
+              <Button x:Name="ApplyButton" Grid.Row="1" Grid.Column="1" Content="XBAR 적용" Style="{StaticResource Primary}" MinWidth="132" MinHeight="46" IsEnabled="False"/>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+      <Border Grid.Column="2" Background="{DynamicResource Sidebar}" CornerRadius="12" Padding="22">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+            <StackPanel>
+              <TextBlock Text="시작 시 자동 적용" FontSize="19" FontWeight="SemiBold"/>
+              <TextBlock Text="저장한 값을 다음 시작에 사용합니다" Style="{StaticResource Quiet}" Margin="0,4,0,0"/>
+              <Grid Margin="0,20,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="저장된 자동 적용값" Style="{StaticResource Quiet}" VerticalAlignment="Center"/><TextBlock x:Name="SavedStartupValue" Grid.Column="1" Text="미저장" FontFamily="Consolas, Malgun Gothic" FontSize="23"/></Grid>
+              <Button x:Name="SaveStartupButton" Content="자동 적용값 저장" ToolTip="GPU에 현재 적용된 값을 자동 적용용으로 저장합니다. 입력 중인 값은 먼저 XBAR 적용을 눌러 주세요."/>
+              <TextBlock x:Name="SaveStartupHint" Style="{StaticResource Quiet}" Margin="0,8,0,0"/>
+              <Border BorderBrush="{DynamicResource SidebarLine}" BorderThickness="0,1,0,0" Padding="0,14,0,0" Margin="0,18,0,0">
+                <StackPanel>
+                  <CheckBox x:Name="AppStartCheck" Content="앱 실행 시 적용" AutomationProperties.Name="앱 실행 시 저장된 XBAR 값 자동 적용"/>
+                  <CheckBox x:Name="WindowsStartCheck" AutomationProperties.Name="Windows 로그인 30초 후 실행하고 저장된 XBAR 값 적용" MinHeight="58"><StackPanel><TextBlock Text="Windows 시작 시 적용"/><TextBlock Text="로그인 30초 후 앱 실행" Style="{StaticResource Quiet}" Margin="0,3,0,0"/></StackPanel></CheckBox>
+                  <TextBlock Text="앱 실행 후 5초 동안 취소할 수 있습니다." Style="{StaticResource Quiet}" Margin="0,8,0,0"/>
+                </StackPanel>
+              </Border>
+              <TextBlock x:Name="StartupPermission" Style="{StaticResource Quiet}" Margin="0,6,0,0"/>
+              <Expander x:Name="CompatibilityExpander" Header="저장 정보 · 연결 상세 · 최근 기록" FontSize="12" Margin="0,18,0,0">
+                <StackPanel Margin="0,10,0,0">
+                  <TextBlock Text="자동 적용 대상" FontWeight="SemiBold" FontSize="12"/><TextBlock x:Name="SavedStartupDevice" Style="{StaticResource Quiet}" Margin="0,6,0,16"/>
+                  <TextBlock Text="연결 상세" FontWeight="SemiBold" FontSize="12"/><TextBlock x:Name="TechnicalDetail" Text="검사 중" Style="{StaticResource Quiet}" Margin="0,6,0,16"/>
+                  <TextBlock Text="최근 기록" FontWeight="SemiBold" FontSize="12"/><StackPanel x:Name="EventPanel" Margin="0,8,0,0"/>
+                </StackPanel>
+              </Expander>
+            </StackPanel>
+          </ScrollViewer>
+          <Border Grid.Row="1" BorderBrush="{DynamicResource SidebarLine}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0"><StackPanel><TextBlock x:Name="StartupDetail" Text="현재 적용값을 저장한 뒤 켜 주세요." LineHeight="21" AutomationProperties.LiveSetting="Polite"/><Button x:Name="CancelStartupButton" Content="이번 자동 적용 취소" Margin="0,12,0,0" Visibility="Collapsed"/></StackPanel></Border>
+        </Grid>
+      </Border>
+    </Grid>
+    <Grid Grid.Row="3" Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="XBAR만 제어 · 코어, 메모리, 전압 설정 유지" Style="{StaticResource Quiet}"/><TextBlock x:Name="LastRead" Text="로컬 GPU에 연결 중" Style="{StaticResource Quiet}"/></StackPanel><TextBlock Grid.Column="1" Text="XBAR Control 1.3" Style="{StaticResource Quiet}" VerticalAlignment="Bottom"/></Grid>
   </Grid>
 </Window>
