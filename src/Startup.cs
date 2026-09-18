@@ -16,6 +16,7 @@ namespace XbarControl {
         [DataMember] public bool HasProfile;
         [DataMember] public bool AppStart;
         [DataMember] public bool WindowsLogon;
+        [DataMember] public bool StartInTray;
         [DataMember] public string GpuName;
         [DataMember] public uint Bus;
         [DataMember] public string Driver;
@@ -35,6 +36,9 @@ namespace XbarControl {
         }
         public bool Requested(bool logon,bool skip,bool inspect) {
             Validate(); return !skip && !inspect && HasProfile && (logon ? WindowsLogon : AppStart);
+        }
+        public bool TrayRequested(bool logon,bool skip,bool inspect) {
+            return StartInTray && Requested(logon,skip,inspect) && logon;
         }
     }
     public sealed class StartupStore {

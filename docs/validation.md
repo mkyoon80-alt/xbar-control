@@ -31,12 +31,16 @@ Hardware reads were checked on an RTX 5090 with driver 616.92. Hardware writes a
 
 ## 재현 가능한 확인
 
-`--self-test <report.txt>`는 제어 데이터·설정·GPU 일치 검사·미완료 기록·작업 정의 등 29개 테스트를 실행합니다. NVAPI를 불러오거나 GPU를 변경하지 않습니다. 설정 저장 테스트는 보고서 옆 임시 폴더를 이용하고 정리합니다.
+`--self-test <report.txt>`는 제어 데이터·설정·GPU 일치 검사·미완료 기록·작업 정의·트레이 시작 조건·이전 설정 호환성 등 33개 테스트를 실행합니다. NVAPI를 불러오거나 GPU를 변경하지 않습니다. 설정 저장 테스트는 보고서 옆 임시 폴더를 이용하고 정리합니다.
 
 `--diagnose <report.json>`은 실제 GPU 값을 읽고 진단 파일을 작성합니다. SET을 호출하지 않습니다.
 
-`--capture <image.png> <width> <height> [ui-check] [dark]`는 WPF 화면을 렌더링합니다. 이 모드에서는 적용, 관리자 재실행, 시작 설정 저장과 작업 등록을 비활성화합니다. `ui-check`는 입력 검증, 슬라이더 동기화, 리셋, 갱신 도중 편집 보존, 자동 적용 취소 및 최소 창 크기의 입력 영역 검사 등 20개 화면 테스트를 수행합니다. `dark`는 저장된 사용자 테마를 변경하지 않고 다크 화면을 선택합니다.
+`--capture <image.png> <width> <height> [ui-check] [dark] [tray-check]`는 WPF 화면을 렌더링합니다. 이 모드에서는 적용, 관리자 재실행, 시작 설정 저장과 작업 등록을 비활성화합니다. `ui-check`는 입력 검증, 슬라이더 동기화, 리셋, 갱신 도중 편집 보존, 자동 적용 취소 및 최소 창 크기의 입력 영역 검사 등 21개 화면 테스트를 수행합니다. `dark`는 저장된 사용자 테마를 변경하지 않고 다크 화면을 선택합니다.
+
+`tray-check`는 실제 Windows 알림 영역 아이콘을 잠시 생성하여 창을 표시하지 않는 시작, 메뉴로 창 열기, 카운트다운 취소, 쓰기 중 종료 차단, 창 닫기·최소화 후 유지, 오류 시 창 복원, 아이콘 해제와 종료 등 12개 검사를 수행하고 `<image>.tray.txt` 보고서를 남깁니다. 검사용 카운트다운에는 쓰기 작업을 연결하지 않습니다. 사용자 시작 설정을 읽거나 수정하지 않고 종료 시 아이콘도 제거합니다. 트레이는 [Windows NotifyIcon](https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.notifyicon?view=netframework-4.8.1)을 사용합니다.
+
+`tray-minimize-check`는 일반 창으로 시작해 최소화 시 트레이 생성·숨김, 메뉴로 복원, 반복 최소화 시 설정 유지, 일반 창 닫기로 종료 및 아이콘 제거 등 5개 검사를 수행하고 `<image>.minimize.txt` 보고서를 남깁니다. `tray-check`와는 별도로 실행하며 동일하게 실제 GPU 쓰기나 시작 설정 변경을 하지 않습니다.
 
 `--validate-startup-task <report.txt>`는 Windows 작업 스케줄러의 `TASK_VALIDATE_ONLY`로 XML 형식을 확인하고 기존 등록 상태를 조회합니다. 실제 작업을 생성하거나 GPU API를 호출하지 않습니다. [Microsoft 작업 등록 문서](https://learn.microsoft.com/en-us/windows/win32/taskschd/taskfolder-registertaskdefinition)를 참고하세요.
 
-개발 중 제어 데이터·설정 테스트 29개와 화면 테스트 20개가 통과했으며, 화면 테스트는 라이트·다크 모드에서 확인했습니다. Windows 작업 등록 형식 및 조회도 통과했습니다. **실제 예약 작업 설치·등록, 재로그인, GPU 쓰기 및 안정성 시험은 수행하지 않았습니다.** 테스트 통과와 실제 GPU 쓰기 검증은 별개입니다.
+개발 중 제어 데이터·설정 테스트 33개, 화면 테스트 21개, 트레이 검사 12개, 일반 창 최소화 검사 5개가 통과했으며, 화면 테스트는 라이트·다크 모드에서 확인했습니다. Windows 작업 등록 형식 및 조회도 통과했습니다. **실제 예약 작업 설치·등록, 재로그인, GPU 쓰기 및 안정성 시험은 수행하지 않았습니다.** 테스트 통과와 실제 GPU 쓰기 검증은 별개입니다.

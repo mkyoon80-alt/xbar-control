@@ -12,7 +12,8 @@ $arguments = @('/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/utf
     "/reference:$wpf\PresentationCore.dll", "/reference:$wpf\PresentationFramework.dll",
     "/reference:$wpf\WindowsBase.dll", '/reference:System.Xaml.dll', '/reference:System.Core.dll',
     '/reference:System.Runtime.Serialization.dll', '/reference:System.Xml.dll', '/reference:Microsoft.CSharp.dll',
-    "$projectRoot\src\NvApi.cs", "$projectRoot\src\App.cs", "$projectRoot\src\Theme.cs", "$projectRoot\src\Startup.cs", "$projectRoot\src\SelfTests.cs")
+    '/reference:System.Windows.Forms.dll', '/reference:System.Drawing.dll',
+    "$projectRoot\src\NvApi.cs", "$projectRoot\src\App.cs", "$projectRoot\src\Theme.cs", "$projectRoot\src\Startup.cs", "$projectRoot\src\TrayHost.cs", "$projectRoot\src\SelfTests.cs")
 & $compiler @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 Write-Output "Built $output\XbarControl.exe"

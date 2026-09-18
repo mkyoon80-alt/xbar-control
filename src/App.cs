@@ -57,11 +57,14 @@ namespace XbarControl {
                     if (!created && args.Contains("--elevated")) {
                         try { created=mutex.WaitOne(5000); } catch(AbandonedMutexException) { created=true; }
                     }
-                    if (!created && !capture) { if(!args.Contains("--startup")) MessageBox.Show("XBAR Control이 이미 실행 중입니다.", "XBAR Control"); return 0; }
+                    if (!created && !capture) { if(!args.Contains("--startup")) MessageBox.Show("XBAR Control이 이미 실행 중입니다. 트레이 아이콘이 있으면 더블클릭해 창을 열어 주세요.", "XBAR Control"); return 0; }
                     var app = new Application { ShutdownMode=ShutdownMode.OnMainWindowClose };
                     app.DispatcherUnhandledException += delegate(object sender, DispatcherUnhandledExceptionEventArgs e) { MessageBox.Show(e.Exception.Message,"XBAR Control"); e.Handled=true; };
                     var panel = new ControlPanel(args);
-                    app.Run(panel.Window);
+                    app.MainWindow=panel.Window;
+                    app.Exit+=delegate { panel.DisposeTray(); };
+                    app.Dispatcher.BeginInvoke(new Action(panel.Start));
+                    app.Run();
                 }
                 return 0;
             } catch (Exception ex) {
@@ -82,6 +85,8 @@ namespace XbarControl {
         readonly string[] launchArgs;
         bool startupBusy, startupPending, startupCancelled, startupHandled;
         bool taskRegistered;
+        TrayHost tray;
+        bool initializationDispatched, exitRequested, closeToTray;
         string startupMessage = "현재 적용값을 저장한 뒤 켜 주세요.";
         readonly string[] captureArgs; readonly object gpuLock = new object();
         readonly DispatcherTimer poll = new DispatcherTimer();
@@ -116,6 +121,7 @@ namespace XbarControl {
             UI<Button>("SaveStartupButton").Click += async delegate { await SaveStartupValue(); };
             UI<CheckBox>("AppStartCheck").Click += async delegate { await ChangeStartup(false); };
             UI<CheckBox>("WindowsStartCheck").Click += async delegate { await ChangeStartup(true); };
+            UI<CheckBox>("TrayStartCheck").Click += async delegate { await ChangeTrayStartup(); };
             UI<Button>("CancelStartupButton").Click += delegate { CancelStartup(); };
             UI<TextBox>("OffsetInput").TextChanged += delegate {
                 if (syncing) return;
@@ -139,14 +145,51 @@ namespace XbarControl {
             var refreshCommand=new RoutedCommand();
             Window.CommandBindings.Add(new CommandBinding(refreshCommand,async delegate { if(nv==null) await Initialize(); else await Refresh(true); },delegate(object s,CanExecuteRoutedEventArgs e){e.CanExecute=!reading&&!applying&&!initializing&&!startupBusy&&!startupPending;}));
             Window.InputBindings.Add(new KeyBinding(refreshCommand,new KeyGesture(Key.F5)));
-            Window.Loaded += async delegate { await Initialize(); };
+            Window.Loaded += async delegate { if(!initializationDispatched) { initializationDispatched=true; await Initialize(); } };
+            Window.StateChanged += delegate {
+                if(Window.WindowState!=WindowState.Minimized) return;
+                if(EnsureTray()) Window.Hide();
+                else { Window.WindowState=WindowState.Normal; Window.Show(); }
+            };
             Window.Closing += delegate(object s,System.ComponentModel.CancelEventArgs e) {
                 if(applying || startupBusy) { e.Cancel=true; return; }
                 CancelStartup();
+                if(closeToTray && tray!=null && !exitRequested) { e.Cancel=true; Window.Hide(); return; }
                 closing=true; poll.Stop();
             };
+            Window.Closed += delegate { DisposeTray(); };
             poll.Interval=TimeSpan.FromSeconds(2);
-            poll.Tick += async delegate { if(Window.WindowState!=WindowState.Minimized) await Refresh(false); };
+            poll.Tick += async delegate { if(Window.IsVisible && Window.WindowState!=WindowState.Minimized) await Refresh(false); };
+        }
+        public async void Start() {
+            bool skip=launchArgs.Contains("--skip-auto") || (Keyboard.Modifiers&ModifierKeys.Shift)!=0;
+            if(startup.TrayRequested(launchArgs.Contains("--startup"),skip,captureArgs.Length!=0) || captureArgs.Contains("tray-check")) {
+                if(!EnsureTray()) { Window.Show(); return; }
+                closeToTray=true;
+                initializationDispatched=true;
+                await Initialize();
+            } else Window.Show();
+        }
+        bool EnsureTray() {
+            if(tray!=null) return true;
+            try { tray=new TrayHost(ShowWindow,CancelStartup,ExitApplication); Update(); return true; }
+            catch(Exception ex) { DisposeTray(); startupMessage="트레이를 열지 못해 창을 표시합니다. "+ex.Message; AddEvent(startupMessage); Update(); return false; }
+        }
+        void ShowWindow() {
+            if(closing) return;
+            Window.Show(); Window.WindowState=WindowState.Normal; Window.Activate();
+        }
+        void ExitApplication() {
+            if(applying || startupBusy) return;
+            exitRequested=true; Window.Close();
+        }
+        public void DisposeTray() {
+            if(tray!=null) { tray.Dispose(); tray=null; }
+        }
+        void ShowStartupIssue() {
+            if(tray==null || closing || Window.IsVisible) return;
+            if(captureArgs.Length==0) tray.Notify(startupMessage,true);
+            ShowWindow();
         }
         async Task Initialize() {
             if(initializing) return;
@@ -176,17 +219,25 @@ namespace XbarControl {
             initializing=false; Update();
             if(captureArgs.Length==0 && !startupHandled) { startupHandled=true; await ApplyAtStartup(); }
             if(captureArgs.Length>1) {
+                if(captureArgs.Contains("tray-check")) await RunTrayChecks(Path.ChangeExtension(captureArgs[1],"tray.txt"));
+                if(captureArgs.Contains("tray-minimize-check")) await RunMinimizeChecks(Path.ChangeExtension(captureArgs[1],"minimize.txt"));
                 if(captureArgs.Contains("ui-check")) await RunUiChecks(Path.ChangeExtension(captureArgs[1],".txt"));
                 if(captureArgs.Contains("pending") && last!=null) SetTarget((int)Math.Round(last.OffsetKhz/1000.0)+15);
                 if(captureArgs.Contains("startup-preview") && last!=null) {
-                    startup=new StartupSettings { HasProfile=true, AppStart=true, WindowsLogon=true, GpuName=nv.Selected.Name, Bus=nv.Selected.Bus, Driver=nv.Driver, ImplementationHash=nv.ImplementationHash, OffsetMhz=last.OffsetKhz/1000 };
+                    startup=new StartupSettings { HasProfile=true, AppStart=true, WindowsLogon=true, StartInTray=true, GpuName=nv.Selected.Name, Bus=nv.Selected.Bus, Driver=nv.Driver, ImplementationHash=nv.ImplementationHash, OffsetMhz=last.OffsetKhz/1000 };
                     startupPending=true; startupMessage="5초 후 저장값 "+Signed(startup.OffsetMhz)+" MHz를 적용합니다. (화면 검사)"; Update();
                 }
                 if(captureArgs.Contains("stress")) {
                     UI<Expander>("CompatibilityExpander").IsExpanded=true;
                     for(int i=0;i<3;i++) AddEvent("화면 검증 기록 "+(i+1)+": 긴 상태 메시지가 표시되어도 아래 안내와 컨트롤이 겹치지 않는지 확인합니다. 이 기록은 화면 검사 전용입니다.");
                 }
-                await Task.Delay(500); Capture(captureArgs[1]); Window.Close();
+                await Task.Delay(500); Capture(captureArgs[1]);
+                if((captureArgs.Contains("tray-check") || captureArgs.Contains("tray-minimize-check")) && tray!=null) {
+                    var exitingTray=tray;
+                    bool manual=captureArgs.Contains("tray-minimize-check");
+                    Window.Closed+=delegate { File.AppendAllText(Path.ChangeExtension(captureArgs[1],manual?"minimize.txt":"tray.txt"),(exitingTray.Visible?"FAIL ":"PASS ")+(manual?"Closing a manually launched window exits and removes its tray icon":"Tray Exit closes the app and removes the icon")+"\r\n"); };
+                    if(manual) Window.Close(); else tray.ExitItem.PerformClick();
+                } else ExitApplication();
             }
         }
         void SetDevice() {
@@ -277,6 +328,8 @@ namespace XbarControl {
             bool usable=last!=null&&!failed&&last.Compatible;
             UI<CheckBox>("AppStartCheck").IsChecked=startup.AppStart;
             UI<CheckBox>("WindowsStartCheck").IsChecked=startup.WindowsLogon;
+            UI<CheckBox>("TrayStartCheck").IsChecked=startup.StartInTray;
+            UI<CheckBox>("TrayStartCheck").IsEnabled=idle&&captureArgs.Length==0&&NvApi.IsAdmin&&startup.WindowsLogon;
             UI<CheckBox>("AppStartCheck").IsEnabled=idle&&captureArgs.Length==0&&(startup.AppStart || (startup.HasProfile&&usable));
             UI<CheckBox>("WindowsStartCheck").IsEnabled=idle&&captureArgs.Length==0&&NvApi.IsAdmin&&(startup.WindowsLogon || taskRegistered || (startup.HasProfile&&usable));
             UI<Button>("SaveStartupButton").IsEnabled=idle&&usable&&captureArgs.Length==0&&(!startup.WindowsLogon||NvApi.IsAdmin);
@@ -289,6 +342,7 @@ namespace XbarControl {
             Text("StartupDetail",startupBusy?"시작 설정을 저장하고 있습니다…":startupMessage);
             Text("StartupPermission",NvApi.IsAdmin?"":"Windows 시작 설정은 상단에서 관리자 권한으로 연 뒤 변경해 주세요.");
             if(!NvApi.IsAdmin && captureArgs.Length==0) UI<Button>("AdminButton").Visibility=Visibility.Visible;
+            if(tray!=null) tray.Update(startupMessage,startupPending,!applying&&!startupBusy);
         }
         void CancelStartup() {
             if(!startupPending) return;
@@ -334,16 +388,28 @@ namespace XbarControl {
                 startupMessage="시작 설정 변경 실패: "+ex.Message;
             } finally { startupBusy=false; Update(); }
         }
+        async Task ChangeTrayStartup() {
+            if(captureArgs.Length!=0 || !UI<CheckBox>("TrayStartCheck").IsEnabled) { Update(); return; }
+            var next=startup.Copy(); next.StartInTray=UI<CheckBox>("TrayStartCheck").IsChecked==true;
+            startupBusy=true; Update();
+            try {
+                // Update the installed copy as well, so old logon tasks gain tray support.
+                await Task.Run(()=>StartupTask.Register()); taskRegistered=true;
+                startupStore.Save(next); startup=next;
+                startupMessage=next.StartInTray?"다음 Windows 로그인부터 트레이로 시작합니다. 아이콘을 더블클릭하면 창이 열립니다.":"다음 Windows 로그인부터 창을 표시합니다.";
+            } catch(Exception ex) { startupMessage="트레이 시작 설정 변경 실패: "+ex.Message; }
+            finally { startupBusy=false; Update(); }
+        }
         async Task ApplyAtStartup() {
             bool logon=launchArgs.Contains("--startup");
             bool skip=launchArgs.Contains("--skip-auto") || (Keyboard.Modifiers&ModifierKeys.Shift)!=0;
             if(!startup.Requested(logon,skip,captureArgs.Length!=0)) return;
             if(last==null || failed || !last.Compatible || !startup.Matches(nv.Selected,nv.Driver,nv.ImplementationHash) || startupStore.Interrupted) {
-                startupMessage="자동 적용을 건너뛰었습니다. GPU·드라이버와 현재 값을 확인하고 다시 저장해 주세요."; Update(); return;
+                startupMessage="자동 적용을 건너뛰었습니다. GPU·드라이버와 현재 값을 확인하고 다시 저장해 주세요."; Update(); ShowStartupIssue(); return;
             }
             if(!NvApi.IsAdmin) {
                 if(!logon) Elevate(true);
-                else { startupMessage="관리자 권한이 없어 자동 적용하지 않았습니다. Windows 시작 옵션을 다시 등록해 주세요."; Update(); }
+                else { startupMessage="관리자 권한이 없어 자동 적용하지 않았습니다. Windows 시작 옵션을 다시 등록해 주세요."; Update(); ShowStartupIssue(); }
                 return;
             }
             poll.Stop(); startupPending=true; startupCancelled=false;
@@ -351,6 +417,7 @@ namespace XbarControl {
             try {
                 for(int seconds=5;seconds>0;seconds--) {
                     startupMessage=seconds+"초 후 저장값 "+Signed(planned)+" MHz를 적용합니다."; Update();
+                    if(seconds==5 && tray!=null) tray.Notify(startupMessage+" 트레이 우클릭 메뉴에서 취소할 수 있습니다.");
                     await Task.Delay(1000);
                     if(closing || startupCancelled) return;
                 }
@@ -359,17 +426,18 @@ namespace XbarControl {
                     throw new InvalidOperationException("저장 설정이 변경되어 이번 자동 적용을 중지했습니다.");
                 await Refresh(false);
                 if(closing || startupCancelled) return;
-                if(last==null || failed || !last.Compatible) { startupMessage="현재 값을 확인하지 못해 이번 자동 적용을 건너뛰었습니다."; return; }
+                if(last==null || failed || !last.Compatible) { startupMessage="현재 값을 확인하지 못해 이번 자동 적용을 건너뛰었습니다."; ShowStartupIssue(); return; }
                 SetTarget(planned); startupStore.BeginAttempt(); startupPending=false;
                 if(!await Apply(true)) throw new InvalidOperationException("자동 적용을 확인하지 못했습니다. 현재 값을 확인하고 다시 저장해 주세요.");
                 startupStore.ClearAttempt(); startupMessage="자동 적용 완료  "+Signed(planned)+" MHz";
                 AddEvent(startupMessage);
-                if(logon) Window.WindowState=WindowState.Minimized;
+                if(logon && tray==null) Window.WindowState=WindowState.Minimized;
             } catch(Exception ex) {
                 startup.AppStart=false; startup.WindowsLogon=false;
                 try { startupStore.Save(startup); } catch { /* The pending marker keeps subsequent launches fail-closed. */ }
                 try { StartupTask.Remove(); taskRegistered=false; } catch { }
                 startupMessage=ex.Message+" 자동 적용을 껐습니다."; AddEvent(startupMessage);
+                ShowStartupIssue();
             } finally { startupPending=false; if(!closing) poll.Start(); Update(); }
         }
         void Error(string message) {
@@ -393,7 +461,7 @@ namespace XbarControl {
             if(applying || startupBusy || captureArgs.Length!=0) return;
             try {
                 Process.Start(new ProcessStartInfo { FileName=Assembly.GetExecutingAssembly().Location,UseShellExecute=true,Verb="runas",Arguments="--elevated --owner "+StartupTask.UserSid+(autoResume?"":" --skip-auto") });
-                Window.Close();
+                ExitApplication();
             } catch(System.ComponentModel.Win32Exception) { startupMessage="관리자 실행이 취소되어 이번 자동 적용을 건너뛰었습니다."; AddEvent("관리자 실행이 취소되었습니다"); Update(); }
         }
         void ChangeTheme(bool dark,bool persist) {
@@ -455,6 +523,8 @@ namespace XbarControl {
                 check(!startup.HasProfile,"Capture mode cannot persist startup settings");
                 UI<CheckBox>("WindowsStartCheck").IsChecked=true; await ChangeStartup(true);
                 check(!startup.WindowsLogon&&UI<CheckBox>("WindowsStartCheck").IsChecked==false,"Capture mode cannot register a startup task");
+                UI<CheckBox>("TrayStartCheck").IsChecked=true; await ChangeTrayStartup();
+                check(!startup.StartInTray&&UI<CheckBox>("TrayStartCheck").IsChecked==false,"Capture mode cannot save tray startup or replace the installed app");
                 startupPending=true; startupCancelled=false; Update();
                 check(!((RoutedCommand)Window.CommandBindings[0].Command).CanExecute(null,Window),"F5 cannot race the startup countdown");
                 UI<Button>("CancelStartupButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -483,6 +553,53 @@ namespace XbarControl {
             check(manualScroll.ExtentHeight<=manualScroll.ViewportHeight+1,"Manual inputs remain visible without scrolling at this window size");
             results.Add("Hardware writes performed: 0");
             string full=Path.GetFullPath(path); Directory.CreateDirectory(Path.GetDirectoryName(full)); File.WriteAllLines(full,results);
+        }
+        async Task RunTrayChecks(string path) {
+            poll.Stop();
+            var results=new List<string>();
+            Action<bool,string> check=(ok,name)=>results.Add((ok?"PASS ":"FAIL ")+name);
+            check(tray!=null&&tray.Visible&&!Window.IsVisible,"Tray startup creates an icon without showing the window");
+            if(tray!=null) {
+                check(!startup.AppStart&&!startup.WindowsLogon&&!startup.HasProfile,"Tray inspection does not load or enable user startup settings");
+                tray.OpenItem.PerformClick(); await Task.Delay(80);
+                check(Window.IsVisible&&Window.WindowState==WindowState.Normal,"Tray Open restores the control panel");
+                startupPending=true; startupCancelled=false; Update();
+                check(tray.CancelItem.Enabled,"Tray cancellation is available during the countdown");
+                tray.CancelItem.PerformClick();
+                check(startupCancelled&&!startupPending&&!tray.CancelItem.Enabled,"Tray cancellation stops the pending apply and updates the menu");
+                applying=true; Update();
+                check(!tray.ExitItem.Enabled,"Tray Exit is disabled while a write is in progress");
+                applying=false; Update();
+                startupPending=true; startupCancelled=false; Update(); Window.Close();
+                check(!Window.IsVisible&&!closing&&tray.Visible&&startupCancelled,"Closing a tray window cancels the countdown and keeps the icon alive");
+                tray.OpenItem.PerformClick(); Window.WindowState=WindowState.Minimized;
+                check(!Window.IsVisible&&tray.Visible,"Minimizing a tray window hides it from the taskbar");
+                startupMessage="화면 검사: 자동 적용을 확인하지 못했습니다.";
+                ShowStartupIssue();
+                check(Window.IsVisible&&Window.WindowState==WindowState.Normal,"A startup problem restores the window for recovery");
+                var old=tray; DisposeTray();
+                check(!old.Visible,"Disposing the tray removes the notification icon");
+                tray=new TrayHost(ShowWindow,CancelStartup,ExitApplication);
+                check(tray.Visible&&!old.Visible,"A replacement tray does not retain the old icon");
+                startupMessage="현재 적용값을 저장한 뒤 켜 주세요."; Update();
+            }
+            results.Add("Hardware writes performed: 0; startup settings and tasks unchanged.");
+            File.WriteAllLines(Path.GetFullPath(path),results);
+        }
+        async Task RunMinimizeChecks(string path) {
+            poll.Stop();
+            var results=new List<string>();
+            Action<bool,string> check=(ok,name)=>results.Add((ok?"PASS ":"FAIL ")+name);
+            check(Window.IsVisible&&tray==null,"Manual launch initially shows a window without a tray icon");
+            Window.WindowState=WindowState.Minimized;
+            check(!Window.IsVisible&&tray!=null&&tray.Visible,"Minimizing a manual launch creates a tray icon and hides the window");
+            if(tray!=null) {
+                tray.OpenItem.PerformClick(); await Task.Delay(80);
+                check(Window.IsVisible&&Window.WindowState==WindowState.Normal,"The minimized manual window can be restored from its tray menu");
+                Window.WindowState=WindowState.Minimized; tray.OpenItem.PerformClick();
+                check(Window.IsVisible&&tray.Visible&&!startup.AppStart&&!startup.WindowsLogon,"Repeated minimize and restore preserves startup preferences");
+            }
+            File.WriteAllLines(Path.GetFullPath(path),results);
         }
     }
 }
