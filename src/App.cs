@@ -35,6 +35,11 @@ namespace XbarControl {
         [STAThread] public static int Main(string[] args) {
             try {
                 if (args.Length > 0 && args[0] == "--self-test") return SelfTests.Run(args.Length > 1 ? args[1] : "self-test.txt");
+                if (args.Length > 1 && args[0] == "--validate-startup-task") {
+                    StartupTask.ValidateOnly(); bool registered=StartupTask.IsRegistered(); File.WriteAllText(args[1],"PASS Windows Task Scheduler validation and registration query. Existing task: "+registered+". No task created; no GPU API calls."); return 0;
+                }
+                int owner=Array.IndexOf(args,"--owner");
+                if(owner>=0 && (owner+1>=args.Length || args[owner+1]!=StartupTask.UserSid)) throw new InvalidOperationException("같은 Windows 계정으로 관리자 권한을 승인해 주세요.");
                 if (args.Length > 1 && args[0] == "--diagnose") {
                     var d = new Diagnostic(); int exit = 0;
                     try { using (var nv = new NvApi()) { var s = nv.Sample(); d.Gpu=nv.Selected.Name; d.Driver=nv.Driver; d.ImplementationSha256=nv.ImplementationHash; d.Administrator=NvApi.IsAdmin; d.StructureValidated=s.Compatible; d.OffsetKhz=s.OffsetKhz; d.MeasuredClockMhz=s.ClockMhz; d.Timestamp=s.Time.ToString("o"); } }
@@ -43,16 +48,19 @@ namespace XbarControl {
                     return exit;
                 }
                 bool capture = args.Length > 1 && args[0] == "--capture";
+                if(args.Contains("--startup") && !capture) {
+                    try { if(!new StartupStore(StartupStore.DefaultDirectory).Load().WindowsLogon) return 0; } catch { /* Show the recovery UI for unreadable settings. */ }
+                }
                 // Only one interactive instance can issue writes for this user.
                 bool created;
                 using (var mutex = new Mutex(true, "Local\\XbarControl.Desktop.v1", out created)) {
                     if (!created && args.Contains("--elevated")) {
                         try { created=mutex.WaitOne(5000); } catch(AbandonedMutexException) { created=true; }
                     }
-                    if (!created && !capture) { MessageBox.Show("XBAR Control이 이미 실행 중입니다.", "XBAR Control"); return 0; }
+                    if (!created && !capture) { if(!args.Contains("--startup")) MessageBox.Show("XBAR Control이 이미 실행 중입니다.", "XBAR Control"); return 0; }
                     var app = new Application { ShutdownMode=ShutdownMode.OnMainWindowClose };
                     app.DispatcherUnhandledException += delegate(object sender, DispatcherUnhandledExceptionEventArgs e) { MessageBox.Show(e.Exception.Message,"XBAR Control"); e.Handled=true; };
-                    var panel = new ControlPanel(capture ? args : new string[0]);
+                    var panel = new ControlPanel(args);
                     app.Run(panel.Window);
                 }
                 return 0;
@@ -65,10 +73,16 @@ namespace XbarControl {
     }
     public sealed class ControlPanel {
         public Window Window;
-        NvApi nv; Reading last; int? startingKhz; int? target;
+        NvApi nv; Reading last; int? target;
         bool syncing, reading, applying, failed, closing, selecting, initializing;
         long editRevision;
         bool darkTheme, changingTheme;
+        StartupSettings startup = new StartupSettings();
+        readonly StartupStore startupStore = new StartupStore(StartupStore.DefaultDirectory);
+        readonly string[] launchArgs;
+        bool startupBusy, startupPending, startupCancelled, startupHandled;
+        bool taskRegistered;
+        string startupMessage = "현재 적용값을 저장한 뒤 켜 주세요.";
         readonly string[] captureArgs; readonly object gpuLock = new object();
         readonly DispatcherTimer poll = new DispatcherTimer();
         readonly List<string> history = new List<string>();
@@ -76,44 +90,59 @@ namespace XbarControl {
         void Text(string name,string value) { UI<TextBlock>(name).Text=value; }
         static string Signed(double value) { return value.ToString("+0.###;−0.###;0",CultureInfo.InvariantCulture); }
         public ControlPanel(string[] capture) {
-            captureArgs=capture;
+            launchArgs=capture;
+            captureArgs=capture.Length>1 && capture[0]=="--capture" ? capture : new string[0];
             using (var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("MainWindow.xaml")) Window=(Window)XamlReader.Load(stream);
-            ChangeTheme(capture.Length>0 ? capture.Contains("dark") : Theme.Load(Theme.SettingsPath),false);
+            ChangeTheme(captureArgs.Length>0 ? captureArgs.Contains("dark") : Theme.Load(Theme.SettingsPath),false);
+            if(captureArgs.Length==0) {
+                try {
+                    startup=startupStore.Load();
+                    if(startupStore.Interrupted) {
+                        startup.AppStart=false; startup.WindowsLogon=false; startupStore.Save(startup);
+                        startupMessage="이전 자동 적용이 완료되지 않아 중지했습니다. 현재 값을 확인하고 다시 저장해 주세요.";
+                    } else if(startup.HasProfile) startupMessage="저장한 값만 자동 적용합니다. 입력 중인 값은 저장되지 않습니다.";
+                } catch(Exception ex) { startup=new StartupSettings(); startupMessage="설정을 읽지 못해 자동 적용을 껐습니다. "+ex.Message; }
+            }
             UI<RadioButton>("LightTheme").Checked += delegate { if(!changingTheme) ChangeTheme(false,true); };
             UI<RadioButton>("DarkTheme").Checked += delegate { if(!changingTheme) ChangeTheme(true,true); };
             Window.SourceInitialized += delegate { Theme.ApplyTitleBar(Window,darkTheme); };
-            if (capture.Length >= 4) { Window.Width=int.Parse(capture[2]); Window.Height=int.Parse(capture[3]); }
+            if (captureArgs.Length >= 4) { Window.Width=int.Parse(captureArgs[2]); Window.Height=int.Parse(captureArgs[3]); }
             UI<Button>("RefreshButton").Click += async delegate { if(nv==null) await Initialize(); else await Refresh(true); };
             UI<Button>("ApplyButton").Click += async delegate { await Apply(); };
             UI<Button>("PlusButton").Click += delegate { Nudge(15); };
             UI<Button>("MinusButton").Click += delegate { Nudge(-15); };
-            UI<Button>("ZeroButton").Click += delegate { SetTarget(0); };
-            UI<Button>("StartButton").Click += delegate { if(startingKhz.HasValue) SetTarget((int)Math.Round(startingKhz.Value/1000.0)); };
-            UI<Button>("AdminButton").Click += delegate { Elevate(); };
+            UI<Button>("ResetButton").Click += delegate { CancelStartup(); SetTarget(0); };
+            UI<Button>("AdminButton").Click += delegate { Elevate(false); };
+            UI<Button>("SaveStartupButton").Click += async delegate { await SaveStartupValue(); };
+            UI<CheckBox>("AppStartCheck").Click += async delegate { await ChangeStartup(false); };
+            UI<CheckBox>("WindowsStartCheck").Click += async delegate { await ChangeStartup(true); };
+            UI<Button>("CancelStartupButton").Click += delegate { CancelStartup(); };
             UI<TextBox>("OffsetInput").TextChanged += delegate {
                 if (syncing) return;
+                CancelStartup();
                 editRevision++;
                 int v; bool valid=int.TryParse(UI<TextBox>("OffsetInput").Text,NumberStyles.AllowLeadingSign,CultureInfo.InvariantCulture,out v) && v>=-1000 && v<=1000;
                 target=valid ? (int?)v : null;
                 if (valid) UpdateSlider(v);
                 Update();
             };
-            UI<Slider>("OffsetSlider").ValueChanged += delegate(object sender, RoutedPropertyChangedEventArgs<double> e) { if(!syncing) SetTarget((int)Math.Round(e.NewValue)); };
+            UI<Slider>("OffsetSlider").ValueChanged += delegate(object sender, RoutedPropertyChangedEventArgs<double> e) { if(!syncing) { CancelStartup(); SetTarget((int)Math.Round(e.NewValue)); } };
             UI<ComboBox>("GpuSelector").SelectionChanged += async delegate {
-                if(selecting || nv==null || applying || reading) return;
+                if(selecting || nv==null || applying || reading || startupBusy) return;
                 var selected=UI<ComboBox>("GpuSelector").SelectedItem as GpuDevice;
                 if(selected==null || selected==nv.Selected) return;
-                lock(gpuLock) nv.Selected=selected;
-                last=null; target=null; startingKhz=null; failed=false;
+                CancelStartup(); lock(gpuLock) nv.Selected=selected;
+                last=null; target=null; failed=false;
                 Text("CurrentValue","—"); Text("TargetValue","—"); Text("PhysicalClock","읽는 중…");
                 SetDevice(); await Refresh(true);
             };
             var refreshCommand=new RoutedCommand();
-            Window.CommandBindings.Add(new CommandBinding(refreshCommand,async delegate { if(nv==null) await Initialize(); else await Refresh(true); },delegate(object s,CanExecuteRoutedEventArgs e){e.CanExecute=!reading&&!applying&&!initializing;}));
+            Window.CommandBindings.Add(new CommandBinding(refreshCommand,async delegate { if(nv==null) await Initialize(); else await Refresh(true); },delegate(object s,CanExecuteRoutedEventArgs e){e.CanExecute=!reading&&!applying&&!initializing&&!startupBusy&&!startupPending;}));
             Window.InputBindings.Add(new KeyBinding(refreshCommand,new KeyGesture(Key.F5)));
             Window.Loaded += async delegate { await Initialize(); };
             Window.Closing += delegate(object s,System.ComponentModel.CancelEventArgs e) {
-                if(applying) { e.Cancel=true; return; }
+                if(applying || startupBusy) { e.Cancel=true; return; }
+                CancelStartup();
                 closing=true; poll.Stop();
             };
             poll.Interval=TimeSpan.FromSeconds(2);
@@ -125,6 +154,17 @@ namespace XbarControl {
             try {
                 nv=await Task.Run(()=>new NvApi());
                 if(closing) { nv.Dispose(); return; }
+                if(startup.HasProfile && captureArgs.Length==0) {
+                    var matches=nv.Devices.Where(g=>g.Name==startup.GpuName && g.Bus==startup.Bus).ToArray();
+                    if(matches.Length==1) nv.Selected=matches[0];
+                }
+                if(captureArgs.Length==0) {
+                    try {
+                        taskRegistered=await Task.Run(()=>StartupTask.IsRegistered());
+                        if(taskRegistered && startupStore.Interrupted && NvApi.IsAdmin) { await Task.Run(()=>StartupTask.Remove()); taskRegistered=false; }
+                    }
+                    catch(Exception ex) { startupMessage="Windows 시작 등록 상태를 확인하지 못했습니다. "+ex.Message; }
+                }
                 selecting=true;
                 UI<ComboBox>("GpuSelector").ItemsSource=nv.Devices;
                 UI<ComboBox>("GpuSelector").SelectedItem=nv.Selected;
@@ -134,9 +174,14 @@ namespace XbarControl {
                 if(!failed) AddEvent("GPU 연결 · 설정 읽기 완료");
             } catch(Exception ex) { Error(ex.Message); }
             initializing=false; Update();
+            if(captureArgs.Length==0 && !startupHandled) { startupHandled=true; await ApplyAtStartup(); }
             if(captureArgs.Length>1) {
                 if(captureArgs.Contains("ui-check")) await RunUiChecks(Path.ChangeExtension(captureArgs[1],".txt"));
                 if(captureArgs.Contains("pending") && last!=null) SetTarget((int)Math.Round(last.OffsetKhz/1000.0)+15);
+                if(captureArgs.Contains("startup-preview") && last!=null) {
+                    startup=new StartupSettings { HasProfile=true, AppStart=true, WindowsLogon=true, GpuName=nv.Selected.Name, Bus=nv.Selected.Bus, Driver=nv.Driver, ImplementationHash=nv.ImplementationHash, OffsetMhz=last.OffsetKhz/1000 };
+                    startupPending=true; startupMessage="5초 후 저장값 "+Signed(startup.OffsetMhz)+" MHz를 적용합니다. (화면 검사)"; Update();
+                }
                 if(captureArgs.Contains("stress")) {
                     UI<Expander>("CompatibilityExpander").IsExpanded=true;
                     for(int i=0;i<3;i++) AddEvent("화면 검증 기록 "+(i+1)+": 긴 상태 메시지가 표시되어도 아래 안내와 컨트롤이 겹치지 않는지 확인합니다. 이 기록은 화면 검사 전용입니다.");
@@ -151,7 +196,7 @@ namespace XbarControl {
             Text("TechnicalDetail","제어 대상: XBAR (도메인 1)\n"+(nv.DriverValidated?"드라이버 구조 확인됨":"검증 목록에 없는 드라이버")+"\n읽기 응답은 연결 시마다 검사합니다.\n쓰기 성공 및 오버클럭 안정성은 별도 확인이 필요합니다.");
         }
         async Task Refresh(bool explicitRefresh, Func<Task<Reading>> sampleOverride = null) {
-            if(nv==null || reading || applying || closing) return;
+            if(nv==null || reading || applying || closing || startupBusy) return;
             reading=true; Update();
             bool pristine=last==null || (target.HasValue && target.Value*1000==last.OffsetKhz);
             long revisionAtRead=editRevision;
@@ -160,7 +205,6 @@ namespace XbarControl {
                 if(closing) return;
                 bool changed=last!=null && next.OffsetKhz!=last.OffsetKhz;
                 last=next; failed=false;
-                if(!startingKhz.HasValue) startingKhz=next.OffsetKhz;
                 if(pristine && revisionAtRead==editRevision) SetTarget((int)Math.Round(next.OffsetKhz/1000.0));
                 ShowReading();
                 if(changed) AddEvent("현재 XBAR  " + Signed(next.OffsetKhz/1000.0)+" MHz");
@@ -186,14 +230,14 @@ namespace XbarControl {
             v=Math.Max(-1000,Math.Min(1000,v)); target=v; syncing=true;
             UI<TextBox>("OffsetInput").Text=v.ToString(CultureInfo.InvariantCulture); UpdateSlider(v); syncing=false; Update();
         }
-        void Nudge(int delta) { if(target.HasValue) SetTarget(target.Value+delta); }
+        void Nudge(int delta) { CancelStartup(); if(target.HasValue) SetTarget(target.Value+delta); }
         void Update() {
             bool has=last!=null&&!failed; bool valid=target.HasValue;
             bool dirty=has && valid && target.Value*1000!=last.OffsetKhz;
-            foreach(string name in new[]{"OffsetInput","OffsetSlider","PlusButton","MinusButton","ZeroButton","StartButton"}) UI<Control>(name).IsEnabled=has&&!applying;
-            UI<Button>("RefreshButton").IsEnabled=!reading&&!applying&&!initializing;
-            UI<ComboBox>("GpuSelector").IsEnabled=!reading&&!applying;
-            UI<Button>("ApplyButton").IsEnabled=dirty&&!reading&&!applying&&last.Compatible&&NvApi.IsAdmin&&captureArgs.Length==0;
+            foreach(string name in new[]{"OffsetInput","OffsetSlider","PlusButton","MinusButton","ResetButton"}) UI<Control>(name).IsEnabled=has&&!applying&&!startupBusy;
+            UI<Button>("RefreshButton").IsEnabled=!reading&&!applying&&!initializing&&!startupBusy&&!startupPending;
+            UI<ComboBox>("GpuSelector").IsEnabled=!reading&&!applying&&!startupBusy;
+            UI<Button>("ApplyButton").IsEnabled=dirty&&!reading&&!applying&&!startupBusy&&!startupPending&&last.Compatible&&NvApi.IsAdmin&&captureArgs.Length==0;
             UI<Button>("ApplyButton").Content=applying?"적용 확인 중…":"XBAR 적용";
             Text("TargetValue",valid?Signed(target.Value):"—");
             bool invalid=has&&!valid;
@@ -205,9 +249,10 @@ namespace XbarControl {
             Text("StateBadgeText",badge);
             UI<Border>("StateBadge").SetResourceReference(Border.BackgroundProperty,dirty?"PendingSurface":"StatusSurface");
             Text("ApplyStatus",failed?"읽기 실패 · 새로고침해 주세요":!has?"GPU 연결 중":applying?"드라이버 응답을 확인합니다":!valid?"입력값을 확인해 주세요":!last.Compatible?"미검증 드라이버 · 적용 불가":!NvApi.IsAdmin?"적용하려면 관리자 권한 필요":dirty?"XBAR "+Signed(target.Value)+" MHz 준비됨":"변경 사항 없음");
+            UpdateStartup();
         }
-        async Task Apply() {
-            if(!UI<Button>("ApplyButton").IsEnabled || captureArgs.Length!=0) return;
+        async Task<bool> Apply(bool automatic=false) {
+            if((!automatic && !UI<Button>("ApplyButton").IsEnabled) || captureArgs.Length!=0 || last==null || failed || !last.Compatible || !NvApi.IsAdmin || !target.HasValue || applying || reading) return false;
             int requested=target.Value, expected=last.OffsetKhz;
             applying=true; Update();
             string failure=null;
@@ -225,7 +270,104 @@ namespace XbarControl {
                 try { last=await Task.Run(()=>{lock(gpuLock)return nv.Sample();}); ShowReading(); } catch {}
                 Error(failure);
             }
-            applying=false; Update();
+            applying=false; Update(); return failure==null;
+        }
+        void UpdateStartup() {
+            bool idle=!startupBusy&&!applying&&!reading&&!initializing&&!startupPending;
+            bool usable=last!=null&&!failed&&last.Compatible;
+            UI<CheckBox>("AppStartCheck").IsChecked=startup.AppStart;
+            UI<CheckBox>("WindowsStartCheck").IsChecked=startup.WindowsLogon;
+            UI<CheckBox>("AppStartCheck").IsEnabled=idle&&captureArgs.Length==0&&(startup.AppStart || (startup.HasProfile&&usable));
+            UI<CheckBox>("WindowsStartCheck").IsEnabled=idle&&captureArgs.Length==0&&NvApi.IsAdmin&&(startup.WindowsLogon || taskRegistered || (startup.HasProfile&&usable));
+            UI<Button>("SaveStartupButton").IsEnabled=idle&&usable&&captureArgs.Length==0&&(!startup.WindowsLogon||NvApi.IsAdmin);
+            UI<Button>("CancelStartupButton").Visibility=startupPending?Visibility.Visible:Visibility.Collapsed;
+            Text("SavedStartupValue",startup.HasProfile?Signed(startup.OffsetMhz)+" MHz":"미저장");
+            Text("SavedStartupDevice",startup.HasProfile?startup.GpuName.Replace("NVIDIA ","")+" · PCI "+startup.Bus+"\n드라이버 "+startup.Driver:"현재 적용값을 저장해서 사용합니다.");
+            Text("StartupDetail",startupBusy?"시작 설정을 저장하고 있습니다…":startupMessage);
+            Text("StartupPermission",NvApi.IsAdmin?"Windows 로그인 20초 후 실행합니다.":"Windows 시작 설정은 관리자 권한이 필요합니다.");
+            if(!NvApi.IsAdmin && captureArgs.Length==0) UI<Button>("AdminButton").Visibility=Visibility.Visible;
+        }
+        void CancelStartup() {
+            if(!startupPending) return;
+            startupCancelled=true; startupPending=false;
+            startupMessage="이번 자동 적용을 취소했습니다. 다음 시작 설정은 유지됩니다.";
+            Update();
+        }
+        async Task SaveStartupValue() {
+            if(captureArgs.Length!=0 || !UI<Button>("SaveStartupButton").IsEnabled) return;
+            startupBusy=true; Update();
+            try {
+                Reading current=await Task.Run(()=>{lock(gpuLock)return nv.Sample();});
+                if(!current.Compatible || current.OffsetKhz%1000!=0) throw new InvalidOperationException("현재 드라이버와 오프셋을 확인한 뒤 저장해 주세요.");
+                var next=startup.Copy(); next.HasProfile=true; next.OffsetMhz=current.OffsetKhz/1000;
+                next.GpuName=nv.Selected.Name; next.Bus=nv.Selected.Bus; next.Driver=nv.Driver; next.ImplementationHash=nv.ImplementationHash;
+                if(next.WindowsLogon) { await Task.Run(()=>StartupTask.Register()); taskRegistered=true; }
+                startupStore.Save(next); startup=next; startupStore.ClearAttempt();
+                last=current; failed=false; ShowReading();
+                startupMessage="현재 적용값 "+Signed(next.OffsetMhz)+" MHz를 저장했습니다. 시작 옵션을 선택해 주세요.";
+                AddEvent("자동 적용 값 저장  "+Signed(next.OffsetMhz)+" MHz");
+            } catch(Exception ex) { startupMessage="저장 실패: "+ex.Message; }
+            finally { startupBusy=false; Update(); }
+        }
+        async Task ChangeStartup(bool windows) {
+            if(captureArgs.Length!=0) { Update(); return; }
+            bool enabled=UI<CheckBox>(windows?"WindowsStartCheck":"AppStartCheck").IsChecked==true;
+            if(startupBusy || applying || reading || initializing || startupPending) { Update(); return; }
+            var next=startup.Copy(); bool newlyRegistered=false;
+            startupBusy=true; Update();
+            try {
+                if(enabled && (!next.HasProfile || startupStore.Interrupted || last==null || failed || !last.Compatible || !next.Matches(nv.Selected,nv.Driver,nv.ImplementationHash)))
+                    throw new InvalidOperationException("현재 GPU의 적용값을 먼저 저장해 주세요.");
+                if(windows) {
+                    if(!NvApi.IsAdmin) throw new UnauthorizedAccessException("관리자 권한으로 열고 다시 선택해 주세요.");
+                    next.WindowsLogon=enabled;
+                    if(enabled) { await Task.Run(()=>StartupTask.Register()); newlyRegistered=!startup.WindowsLogon; taskRegistered=true; }
+                    else { startupStore.Save(next); startup=next; await Task.Run(()=>StartupTask.Remove()); taskRegistered=false; }
+                } else next.AppStart=enabled;
+                startupStore.Save(next); startup=next;
+                startupMessage=(windows?"Windows 로그인 시 실행·적용":"앱 실행 시 자동 적용")+(enabled?"을 켰습니다. 다음 시작부터 동작합니다.":"을 껐습니다.");
+            } catch(Exception ex) {
+                if(newlyRegistered) { try { StartupTask.Remove(); taskRegistered=false; } catch { } }
+                startupMessage="시작 설정 변경 실패: "+ex.Message;
+            } finally { startupBusy=false; Update(); }
+        }
+        async Task ApplyAtStartup() {
+            bool logon=launchArgs.Contains("--startup");
+            bool skip=launchArgs.Contains("--skip-auto") || (Keyboard.Modifiers&ModifierKeys.Shift)!=0;
+            if(!startup.Requested(logon,skip,captureArgs.Length!=0)) return;
+            if(last==null || failed || !last.Compatible || !startup.Matches(nv.Selected,nv.Driver,nv.ImplementationHash) || startupStore.Interrupted) {
+                startupMessage="자동 적용을 건너뛰었습니다. GPU·드라이버와 현재 값을 확인하고 다시 저장해 주세요."; Update(); return;
+            }
+            if(!NvApi.IsAdmin) {
+                if(!logon) Elevate(true);
+                else { startupMessage="관리자 권한이 없어 자동 적용하지 않았습니다. Windows 시작 옵션을 다시 등록해 주세요."; Update(); }
+                return;
+            }
+            poll.Stop(); startupPending=true; startupCancelled=false;
+            int planned=startup.OffsetMhz;
+            try {
+                for(int seconds=5;seconds>0;seconds--) {
+                    startupMessage=seconds+"초 후 저장값 "+Signed(planned)+" MHz를 적용합니다."; Update();
+                    await Task.Delay(1000);
+                    if(closing || startupCancelled) return;
+                }
+                var latest=startupStore.Load();
+                if(!latest.Requested(logon,false,false) || latest.OffsetMhz!=planned || !latest.Matches(nv.Selected,nv.Driver,nv.ImplementationHash))
+                    throw new InvalidOperationException("저장 설정이 변경되어 이번 자동 적용을 중지했습니다.");
+                await Refresh(false);
+                if(closing || startupCancelled) return;
+                if(last==null || failed || !last.Compatible) { startupMessage="현재 값을 확인하지 못해 이번 자동 적용을 건너뛰었습니다."; return; }
+                SetTarget(planned); startupStore.BeginAttempt(); startupPending=false;
+                if(!await Apply(true)) throw new InvalidOperationException("자동 적용을 확인하지 못했습니다. 현재 값을 확인하고 다시 저장해 주세요.");
+                startupStore.ClearAttempt(); startupMessage="자동 적용 완료  "+Signed(planned)+" MHz";
+                AddEvent(startupMessage);
+                if(logon) Window.WindowState=WindowState.Minimized;
+            } catch(Exception ex) {
+                startup.AppStart=false; startup.WindowsLogon=false;
+                try { startupStore.Save(startup); } catch { /* The pending marker keeps subsequent launches fail-closed. */ }
+                try { StartupTask.Remove(); taskRegistered=false; } catch { }
+                startupMessage=ex.Message+" 자동 적용을 껐습니다."; AddEvent(startupMessage);
+            } finally { startupPending=false; if(!closing) poll.Start(); Update(); }
         }
         void Error(string message) {
             failed=true; Text("ConnectionTitle","상태 확인 필요"); Text("ConnectionDetail",message);
@@ -244,13 +386,12 @@ namespace XbarControl {
                 panel.Children.Add(block);
             }
         }
-        void Elevate() {
-            if(applying || captureArgs.Length!=0) return;
+        void Elevate(bool autoResume) {
+            if(applying || startupBusy || captureArgs.Length!=0) return;
             try {
-                // Relaunch starts from live readings; it never passes a pending offset.
-                Process.Start(new ProcessStartInfo { FileName=Assembly.GetExecutingAssembly().Location,UseShellExecute=true,Verb="runas",Arguments="--elevated" });
+                Process.Start(new ProcessStartInfo { FileName=Assembly.GetExecutingAssembly().Location,UseShellExecute=true,Verb="runas",Arguments="--elevated --owner "+StartupTask.UserSid+(autoResume?"":" --skip-auto") });
                 Window.Close();
-            } catch(System.ComponentModel.Win32Exception) { AddEvent("관리자 실행이 취소되었습니다"); }
+            } catch(System.ComponentModel.Win32Exception) { startupMessage="관리자 실행이 취소되어 이번 자동 적용을 건너뛰었습니다."; AddEvent("관리자 실행이 취소되었습니다"); Update(); }
         }
         void ChangeTheme(bool dark,bool persist) {
             changingTheme=true;
@@ -303,10 +444,22 @@ namespace XbarControl {
                 check(target==-150 && UI<Slider>("OffsetSlider").Value==-150,"Signed number synchronizes slider");
                 UI<Slider>("OffsetSlider").Value=30;
                 check(target==30&&UI<TextBox>("OffsetInput").Text=="30","Slider synchronizes number input");
-                UI<Button>("ZeroButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                check(target==0&&UI<TextBlock>("CurrentValue").Text==current,"Zero prepares only, no implicit apply");
-                UI<Button>("StartButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                check(target==initial,"Session starting value is recoverable");
+                UI<Button>("ResetButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                check(target==0&&UI<TextBlock>("CurrentValue").Text==current,"Single reset prepares zero without applying");
+                check(Window.FindName("StartButton")==null && Window.FindName("ZeroButton")==null,"Duplicate reset controls are removed");
+                check(!startup.AppStart&&!startup.WindowsLogon,"Both startup options default off in capture mode");
+                await SaveStartupValue();
+                check(!startup.HasProfile,"Capture mode cannot persist startup settings");
+                UI<CheckBox>("WindowsStartCheck").IsChecked=true; await ChangeStartup(true);
+                check(!startup.WindowsLogon&&UI<CheckBox>("WindowsStartCheck").IsChecked==false,"Capture mode cannot register a startup task");
+                startupPending=true; startupCancelled=false; Update();
+                check(!((RoutedCommand)Window.CommandBindings[0].Command).CanExecute(null,Window),"F5 cannot race the startup countdown");
+                UI<Button>("CancelStartupButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                check(startupCancelled&&!startupPending,"Countdown cancellation blocks automatic apply");
+                startupPending=true; startupCancelled=false; SetTarget(0);
+                UI<TextBox>("OffsetInput").Text="15";
+                check(startupCancelled&&!startupPending,"Editing cancels the pending automatic apply");
+                startupMessage="현재 적용값을 저장한 뒤 켜 주세요.";
                 check(!UI<Button>("ApplyButton").IsEnabled,"Capture / inspection mode cannot write hardware");
                 SetTarget(initial);
                 var delayed=new TaskCompletionSource<Reading>();

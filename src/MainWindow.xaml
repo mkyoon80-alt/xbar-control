@@ -62,6 +62,18 @@
       </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style TargetType="ToolTip"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource Line}"/></Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="MinHeight" Value="40"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{StaticResource Focus}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Grid Background="Transparent">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border x:Name="CheckFrame" Width="18" Height="18" CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource InputLine}" Background="{DynamicResource Surface}" VerticalAlignment="Center"><Path x:Name="Tick" Data="M 3,8 L 7,12 L 14,4" Stroke="{DynamicResource OnAccent}" StrokeThickness="2" Visibility="Collapsed"/></Border>
+        <ContentPresenter Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center"/>
+      </Grid><ControlTemplate.Triggers>
+        <Trigger Property="IsChecked" Value="True"><Setter TargetName="CheckFrame" Property="Background" Value="{DynamicResource Accent}"/><Setter TargetName="CheckFrame" Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger>
+        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CheckFrame" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger>
+        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource DisabledInk}"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
+      </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style TargetType="ComboBox">
       <Setter Property="MinHeight" Value="36"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="FocusVisualStyle" Value="{StaticResource Focus}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
@@ -147,7 +159,7 @@
               <Button x:Name="PlusButton" Grid.Column="4" Content="+15" AutomationProperties.Name="XBAR 조정값 15 MHz 높이기" IsEnabled="False"/>
             </Grid>
             <TextBlock x:Name="InputHint" Text="1 MHz 단위로 입력 · 버튼으로 15 MHz씩 조정" Style="{StaticResource Quiet}" Margin="0,7,0,0"/>
-            <WrapPanel Margin="0,12,0,0"><Button x:Name="ZeroButton" Content="0 MHz로 준비" FontSize="12" Margin="0,0,8,0" IsEnabled="False"/><Button x:Name="StartButton" Content="시작 값으로 준비" FontSize="12" IsEnabled="False"/></WrapPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><Button x:Name="ResetButton" Content="리셋" FontSize="12" MinWidth="84" IsEnabled="False" ToolTip="오프셋을 0 MHz로 준비합니다. XBAR 적용을 누르면 반영됩니다."/><TextBlock Text="0 MHz로 되돌리기 · 적용 필요" Style="{StaticResource Quiet}" Margin="12,0,0,0" VerticalAlignment="Center"/></StackPanel>
           </StackPanel>
           <Grid Grid.Row="4" Margin="0,16,0,0">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -167,11 +179,26 @@
               <TextBlock x:Name="DriverText" Text="드라이버 확인 중" Style="{StaticResource Quiet}"/>
               <TextBlock x:Name="BusText" Text="" Style="{StaticResource Quiet}" Margin="0,2,0,0"/>
             </StackPanel>
+            <Border BorderBrush="{DynamicResource SidebarLine}" BorderThickness="0,1,0,0" Padding="0,16,0,0" Margin="0,18,0,0">
+              <StackPanel>
+                <TextBlock Text="시작 시 자동 적용" FontWeight="SemiBold"/>
+                <Grid Margin="0,10,0,3"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <TextBlock x:Name="SavedStartupValue" Text="미저장" FontFamily="Consolas, Malgun Gothic" FontSize="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                  <Button x:Name="SaveStartupButton" Grid.Column="1" Content="현재 값 저장" FontSize="12" Padding="9,7" MinHeight="36" ToolTip="GPU에 현재 적용된 값을 자동 적용용으로 저장합니다. 입력 중인 값은 저장하지 않습니다."/>
+                </Grid>
+                <TextBlock x:Name="SavedStartupDevice" Style="{StaticResource Quiet}" Margin="0,0,0,3"/>
+                <CheckBox x:Name="AppStartCheck" Content="앱 실행 시 적용" AutomationProperties.Name="앱 실행 시 저장된 XBAR 값 자동 적용"/>
+                <CheckBox x:Name="WindowsStartCheck" Content="Windows 시작 시 적용" AutomationProperties.Name="Windows 로그인 시 실행하고 저장된 XBAR 값 적용"/>
+                <TextBlock x:Name="StartupDetail" Text="현재 적용값을 저장한 뒤 켜 주세요." Style="{StaticResource Quiet}" Margin="0,5,0,0" AutomationProperties.LiveSetting="Polite"/>
+                <Button x:Name="CancelStartupButton" Content="이번 자동 적용 취소" FontSize="12" Margin="0,8,0,0" Visibility="Collapsed"/>
+                <TextBlock x:Name="StartupPermission" Style="{StaticResource Quiet}" Margin="0,6,0,0"/>
+                <Button x:Name="AdminButton" Content="관리자 권한으로 열기" Margin="0,10,0,0" FontSize="12" Visibility="Collapsed"/>
+              </StackPanel>
+            </Border>
             <Border Grid.Row="1" BorderBrush="{DynamicResource SidebarLine}" BorderThickness="0,1,0,0" Padding="0,18,0,0" Margin="0,20,0,0">
               <StackPanel>
                 <TextBlock x:Name="ConnectionTitle" Text="상태를 확인하고 있습니다" FontWeight="SemiBold" FontSize="13"/>
                 <TextBlock x:Name="ConnectionDetail" Text="드라이버와 XBAR 데이터를 읽습니다." Style="{StaticResource Quiet}" Margin="0,7,0,0"/>
-                <Button x:Name="AdminButton" Content="관리자 권한으로 열기" Margin="0,12,0,0" FontSize="12" Visibility="Collapsed"/>
                 <Expander x:Name="CompatibilityExpander" Header="호환성 상세" FontSize="12" Margin="0,13,0,0" Foreground="{DynamicResource Muted}"><TextBlock x:Name="TechnicalDetail" Text="검사 중" Style="{StaticResource Quiet}" Margin="0,8,0,0"/></Expander>
               </StackPanel>
             </Border>
@@ -182,12 +209,12 @@
             <StackPanel Grid.Row="1" Margin="0,12,0,0">
               <TextBlock Text="XBAR 주파수만 제어합니다." FontSize="12" FontWeight="SemiBold"/>
               <TextBlock Text="코어 · 메모리 · 전압 설정은 유지됩니다." Style="{StaticResource Quiet}" Margin="0,6,0,0"/>
-              <TextBlock Text="시작 시 자동 적용 없음" Style="{StaticResource Quiet}" Margin="0,4,0,0"/>
+              <TextBlock Text="자동 적용은 저장한 값만 사용합니다." Style="{StaticResource Quiet}" Margin="0,4,0,0"/>
             </StackPanel>
           </Grid>
         </Border>
       </Grid>
     </Border>
-    <Grid Grid.Row="3" Margin="0,14,0,0"><TextBlock x:Name="LastRead" Text="로컬 GPU에 연결 중" Style="{StaticResource Quiet}"/><TextBlock Text="XBAR Control 1.1" HorizontalAlignment="Right" Style="{StaticResource Quiet}"/></Grid>
+    <Grid Grid.Row="3" Margin="0,14,0,0"><TextBlock x:Name="LastRead" Text="로컬 GPU에 연결 중" Style="{StaticResource Quiet}"/><TextBlock Text="XBAR Control 1.2" HorizontalAlignment="Right" Style="{StaticResource Quiet}"/></Grid>
   </Grid>
 </Window>

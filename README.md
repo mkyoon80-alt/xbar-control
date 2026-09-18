@@ -4,7 +4,7 @@
 
 A small native Windows utility for XBAR frequency offsets, with a Korean interface and light/dark themes. Built with C# and WPF; no Python, browser, or original overclocking application is needed at runtime.
 
-[**Windows 다운로드**](https://github.com/mkyoon80-alt/xbar-control/releases/tag/v1.1.0) · [한국어 사용법](docs/usage.ko.md) · [검증 범위](docs/validation.md)
+[**Windows 다운로드**](https://github.com/mkyoon80-alt/xbar-control/releases/tag/v1.2.0) · [한국어 사용법](docs/usage.ko.md) · [검증 범위](docs/validation.md)
 
 ![XBAR Control 다크 모드](docs/images/dark.png)
 
@@ -21,11 +21,15 @@ A small native Windows utility for XBAR frequency offsets, with a Korean interfa
 - 직접 입력, 슬라이더, ±15 MHz 버튼으로 값을 준비한 뒤 **XBAR 적용**으로 반영.
 - 라이트·다크 전환 및 선택 저장.
 - 적용 직전 현재 값 확인, 적용 후 드라이버 응답 비교.
-- 코어·메모리·전압 조절, 시작 시 자동 적용, 종료 시 자동 복원 기능은 없습니다.
+- 단일 **리셋** 버튼으로 오프셋 0 MHz 준비.
+- **앱 실행 시 적용**과 **Windows 시작 시 적용**을 각각 선택. 현재 적용값을 별도로 저장해서 사용합니다.
+- 코어·메모리·전압 조절, 종료 시 자동 복원 기능은 없습니다.
 
 ## 실행
 
-Windows 10/11 64비트 및 .NET Framework 4.8을 대상으로 합니다. 릴리스의 `XbarControl-portable.zip`을 풀고 `XbarControl.exe`를 실행하세요. 값을 적용할 때만 앱의 **관리자 권한으로 열기**를 사용합니다.
+Windows 10/11 64비트 및 .NET Framework 4.8을 대상으로 합니다. 릴리스의 `XbarControl-portable.zip`을 풀고 `XbarControl.exe`를 실행하세요. 값을 직접 적용하거나 Windows 시작 옵션을 변경하려면 앱의 **관리자 권한으로 열기**를 사용합니다.
+
+자동 적용은 기본으로 꺼져 있습니다. **현재 값 저장** 후 원하는 시작 옵션을 켜세요. Windows 시작 옵션은 관리자 권한이 필요하며, 로그인 20초 후 실행됩니다. 두 모드 모두 5초 동안 취소할 수 있습니다. [설정·해제 방법](docs/usage.ko.md#시작-시-자동-적용-12)을 확인하세요.
 
 **실험적 도구입니다. RTX 5090 / NVIDIA 616.92에서 읽기와 화면 동작을 확인했지만, 실제 GPU 쓰기 및 오버클럭 안정성은 검증하지 않았습니다.** 입력 가능 범위는 안정성이 확인된 권장 범위가 아닙니다. 드라이버 검사에 실패하면 적용을 제한합니다. 자세한 지원 조건은 [검증 범위](docs/validation.md)를 참고하세요.
 
